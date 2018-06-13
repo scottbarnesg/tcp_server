@@ -11,13 +11,13 @@
 #include <stdlib.h>
 
 /* Define Constants */
-#define LISTEN_PORT "10000" // Port on which to listen for connections
+#define LISTEN_PORT "3490" // Port on which to listen for connections
 #define CONNECT_BUFFER 10 // Number of pending connections to hold in buffer
 
 /* Get server address information */
-struct addrinfo getServerInfo(){
+struct addrinfo getServerInfo(struct addrinfo addr_info, struct addrinfo *server_info){
   int status;
-  struct addrinfo addr_info, *server_info;
+  // struct addrinfo addr_info; //, *server_info;
 
   memset(&addr_info, 0, sizeof addr_info); // Zero memory in struct
 
@@ -34,20 +34,25 @@ struct addrinfo getServerInfo(){
 
 /* Make, bind, and listen to socket */
 int setupSocket(struct addrinfo *server_info){
-  int sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+  int sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol); // Error
+  printf("Created Socket\n");
   bind(sockfd, server_info->ai_addr, server_info->ai_addrlen);
+  printf("Bound to Socket\n");
   listen(sockfd, CONNECT_BUFFER);
   return sockfd;
 }
 
 int main(void){
-  struct addrinfo addr_info, *server_info;
+  printf("Starting\n");
+  struct addrinfo addr_info;
+  struct addrinfo *server_info = malloc(sizeof(*server_info));
   struct sockaddr_storage client_addr;
   socklen_t addr_size;
-
-  addr_info = getServerInfo();
+  printf("Declared Variables\n");
+  addr_info = getServerInfo(addr_info, server_info);
+  printf("Got server info\n");
   int sockfd = setupSocket(server_info);
 
-  freeaddrinfo(server_info);
   shutdown(sockfd, 2);
+  free(server_info);
 }
