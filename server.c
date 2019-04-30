@@ -18,7 +18,7 @@
 int createSocket(struct addrinfo *server_info){
   int sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
   if (sockfd == -1){
-    fprintf(stderr, "socket error: %s\n", gai_strerror(status));
+    fprintf(stderr, "socket error: %s\n", gai_strerror(sockfd));
     exit(1);
   }
   printf("Successfully created socket\n");
