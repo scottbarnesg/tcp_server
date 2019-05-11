@@ -47,8 +47,8 @@ void *processManager(void *input){
   pid_t done_pid;
   int pid_status;
   while(1){
-    if (waitpid(-1, &pid_status, 0) > 0){
-      printf("Child processes %d terminated and has been successfully reaped\n", done_pid);
+    if (done_pid = waitpid(-1, &pid_status, 0) > 0){
+      printf("Child processes terminated and has been successfully reaped\n");
     }
   }
 }
@@ -83,7 +83,8 @@ int handleSession(int sessionfd, struct sockaddr_in remote_addr){
         exit(0);
       }
       else{
-        printf("%s\n", data);
+        data[byte_count] = '\0';
+        printf("Data: %s", data);
       }
     }
   }
@@ -115,6 +116,7 @@ int acceptConnections(int sockfd, struct sockaddr_in remote_addr, socklen_t addr
     printf("Accepted new connection from %s\n", inet_ntoa(remote_addr.sin_addr));
     createSession(sockfd, sessionfd, remote_addr);
   }
+  close(sockfd);
 }
 
 int main(void){
