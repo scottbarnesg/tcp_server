@@ -47,7 +47,7 @@ void *processManager(void *input){
   pid_t done_pid;
   int pid_status;
   while(1){
-    if (waitpid(-1, &pid_status, WNOHANG) > 0){
+    if (waitpid(-1, &pid_status, 0) > 0){
       printf("Child processes %d terminated and has been successfully reaped\n", done_pid);
     }
   }
@@ -71,7 +71,7 @@ int handleSession(int sessionfd, struct sockaddr_in remote_addr){
       exit(1);
     }
     else if (fd_ready == 0){
-      printf("Connection timed out");
+      printf("Connection timed out\n");
       close(sessionfd);
       exit(1);
     }
@@ -136,7 +136,7 @@ int main(void){
   int thread, *void_input;
   thread = pthread_create(&proc_man_thread, NULL, processManager, (void *)void_input);
   acceptConnections(sockfd, remote_addr, addr_size);
-  printf("After accept\n");
+  (void) pthread_join(thread, NULL);
   freeaddrinfo(server_info);
   return 0;
 }
