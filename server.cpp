@@ -17,6 +17,9 @@
 #define LISTEN_PORT "55555" // Port on which to listen for connections
 #define CONNECT_BUFFER 10 // Number of pending connections to hold in buffer
 
+// Global variables
+int fork_counter = 0;
+int connection_counter = 0;
 
 int createSocket(struct addrinfo *server_info){
   int sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
@@ -49,6 +52,11 @@ void *processManager(void *input){
   while(1){
     if (done_pid = waitpid(-1, &pid_status, 0) > 0){
       printf("Child processes terminated and has been successfully reaped\n");
+      fork_counter--;
+      connection_counter--;
+      if (fork_counter != connection_counter){
+        printf("Error: Connection count does not equal fork count\n");
+      }
     }
   }
 }
@@ -105,6 +113,9 @@ int createSession(int sockfd, int sessionfd, struct sockaddr_in remote_addr){
   }
   else{
     printf("Created process %d to serve %s\n", new_fork, inet_ntoa(remote_addr.sin_addr));
+    fork_counter++;
+    printf("Connection count: %d\n", connection_counter);
+    printf("Fork Count:       %d\n", fork_counter);
     close(sessionfd);
   }
 }
@@ -113,6 +124,7 @@ int acceptConnections(int sockfd, struct sockaddr_in remote_addr, socklen_t addr
   int sessionfd;
   while(1){
     sessionfd = accept(sockfd, (struct sockaddr *)&remote_addr, &addr_size);
+    connection_counter++;
     printf("Accepted new connection from %s\n", inet_ntoa(remote_addr.sin_addr));
     createSession(sockfd, sessionfd, remote_addr);
   }
