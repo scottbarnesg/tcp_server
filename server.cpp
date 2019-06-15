@@ -12,17 +12,58 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <pthread.h>
+/* cpp libraries */
+#include <string>
 
 /* Define Constants */
-#define LISTEN_PORT "55555" // Port on which to listen for connections
 #define CONNECT_BUFFER 10 // Number of pending connections to hold in buffer
 
 // Global variables
 int fork_counter = 0;
 int connection_counter = 0;
 
-int createSocket(struct addrinfo *server_info){
-  int sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+class Socket {
+  public:
+    int sockfd;
+    int status;
+    std::string listen_port;
+    struct addrinfo addr_info;
+    struct addrinfo *server_info;
+    int create ( void );
+    int acceptConnections( void );
+    Socket( int port );
+    ~Socket( void );
+  private:
+    struct sockaddr_in remote_addr;
+    socklen_t addr_size;
+    int createSocket( void );
+    int bindAndListen ( void );
+    int handleSession ( int sessionfd );
+    int createSession( int sessionfd );
+};
+
+Socket::Socket( int port ) {
+  listen_port = std::to_string(port);
+  memset(&addr_info, 0, sizeof addr_info);
+  addr_info.ai_family = AF_INET;
+  addr_info.ai_socktype = SOCK_STREAM;
+}
+
+Socket::~Socket(void) {
+  freeaddrinfo(server_info);
+}
+
+int Socket::create(void) {
+  if ((status = getaddrinfo(NULL, listen_port.c_str(), &addr_info, &server_info)) != 0){
+    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+    exit(1);
+  }
+  sockfd = createSocket();
+  status = bindAndListen();
+}
+
+int Socket::createSocket(void){
+  sockfd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
   if (sockfd == -1){
     fprintf(stderr, "socket error: %s\n", gai_strerror(sockfd));
     exit(1);
@@ -30,7 +71,7 @@ int createSocket(struct addrinfo *server_info){
   return sockfd;
 }
 
-int bindAndListen(int sockfd, struct addrinfo *server_info){
+int Socket::bindAndListen(void){
   int res = bind(sockfd, server_info->ai_addr, server_info->ai_addrlen);
   if (res != 0){
     printf("Bind error - errno: %d\n", errno);
@@ -41,27 +82,11 @@ int bindAndListen(int sockfd, struct addrinfo *server_info){
     printf("Listen error - errno: %d\n", errno);
     exit(1);
   }
-  printf("Listening for incoming connections on port %s\n", LISTEN_PORT);
+  printf("Listening for incoming connections on port %s\n", listen_port.c_str());
   return res;
 }
 
-void *processManager(void *input){
-  printf("Created process manager thread\n");
-  pid_t done_pid;
-  int pid_status;
-  while(1){
-    if (done_pid = waitpid(-1, &pid_status, 0) > 0){
-      printf("Child processes terminated and has been successfully reaped\n");
-      fork_counter--;
-      connection_counter--;
-      if (fork_counter != connection_counter){
-        printf("Error: Connection count does not equal fork count\n");
-      }
-    }
-  }
-}
-
-int handleSession(int sessionfd, struct sockaddr_in remote_addr){
+int Socket::handleSession(int sessionfd){
   char data[512];
   fd_set sess_fdset;
   struct timeval timeout;
@@ -98,7 +123,7 @@ int handleSession(int sessionfd, struct sockaddr_in remote_addr){
   }
 }
 
-int createSession(int sockfd, int sessionfd, struct sockaddr_in remote_addr){
+int Socket::createSession(int sessionfd){
   if (sessionfd == -1){
     printf("Session creation error\n");
     return 1;
@@ -109,7 +134,7 @@ int createSession(int sockfd, int sessionfd, struct sockaddr_in remote_addr){
   }
   else if (new_fork == 0){
     close(sockfd);
-    handleSession(sessionfd, remote_addr);
+    handleSession(sessionfd);
   }
   else{
     printf("Created process %d to serve %s\n", new_fork, inet_ntoa(remote_addr.sin_addr));
@@ -120,37 +145,41 @@ int createSession(int sockfd, int sessionfd, struct sockaddr_in remote_addr){
   }
 }
 
-int acceptConnections(int sockfd, struct sockaddr_in remote_addr, socklen_t addr_size){
+int Socket::acceptConnections(void){
   int sessionfd;
   while(1){
     sessionfd = accept(sockfd, (struct sockaddr *)&remote_addr, &addr_size);
     connection_counter++;
     printf("Accepted new connection from %s\n", inet_ntoa(remote_addr.sin_addr));
-    createSession(sockfd, sessionfd, remote_addr);
+    createSession(sessionfd);
   }
   close(sockfd);
 }
 
-int main(void){
-  int status;
-  struct addrinfo addr_info;
-  struct addrinfo *server_info;
-  memset(&addr_info, 0, sizeof addr_info);
-  addr_info.ai_family = AF_INET;
-  addr_info.ai_socktype = SOCK_STREAM;
-  if ((status = getaddrinfo(NULL, LISTEN_PORT, &addr_info, &server_info)) != 0){
-    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-    exit(1);
+void *processManager(void *input){
+  printf("Created process manager thread\n");
+  pid_t done_pid;
+  int pid_status;
+  while(1){
+    if (done_pid = waitpid(-1, &pid_status, 0) > 0){
+      printf("Child processes terminated and has been successfully reaped\n");
+      fork_counter--;
+      connection_counter--;
+      if (fork_counter != connection_counter){
+        printf("Error: thread = pthread_create(&proc_man_thread, NULL, processManager, (void *)void_input);Connection count does not equal fork count\n");
+      }
+    }
   }
-  int sockfd = createSocket(server_info);
-  status = bindAndListen(sockfd, server_info);
-  struct sockaddr_in remote_addr;
-  socklen_t addr_size;
+}
+
+int main(void){
+  int port = 55555;
+  Socket tcp_socket(port);
+  tcp_socket.create();
   pthread_t proc_man_thread;
   int thread, *void_input;
   thread = pthread_create(&proc_man_thread, NULL, processManager, (void *)void_input);
-  acceptConnections(sockfd, remote_addr, addr_size);
+  tcp_socket.acceptConnections();
   (void) pthread_join(thread, NULL);
-  freeaddrinfo(server_info);
   return 0;
 }
